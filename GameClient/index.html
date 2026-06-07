@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<head>
+
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <script src="./playerManager.js"></script>
+
+    <div class="bigScreen" id="preEverything">
+        <h1>Pre everything screen, you will put your name and enter a code or ip here</h1>
+    </div>
+
+    <div class="bigScreen" id="pregame">
+        <h1>Whats good we are in a lobby now. Draw your character and make your sound bite</h1>
+        <h1>Your name: <span id="usernamePregame">NamePlaceholderHere</span></h1>
+
+        <canvas id="makeCharacterCanvas" class="drawCharacterCanvasPregame"></canvas>
+        <button class="colorButton whiteBG" onclick="pregameSetColor(this)"></button>
+        <button class="colorButton blackBG" onclick="pregameSetColor(this)"></button>
+        <button class="colorButton makeMyColorBG" onclick="pregameSetColor(this)"></button>
+
+        <script src="./screenScripts/pregameLobby.js"></script>
+    </div>
+
+    <script src="./screenManager.js"></script>
+    <script src="./networkManager.js"></script>
+</body>
