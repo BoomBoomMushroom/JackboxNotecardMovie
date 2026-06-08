@@ -110,7 +110,17 @@ function clearAndDrawStrokes(){
 function pregameUndoStroke(){
     allStrokes.pop()
     clearAndDrawStrokes()
+    sendCharacterDrawing() // inform the server of our changes
 }
+
+function sendCharacterDrawing(){
+    characterPacket = {
+        "packetPurpose": "SendCharacterDrawing",
+        "drawingStrokes": allStrokes
+    }
+    sendMessage(JSON.stringify(characterPacket))
+}
+
 
 pregameCanvas.addEventListener("mousedown", (e)=>{
     isMouseDown = true
@@ -125,6 +135,7 @@ pregameCanvas.addEventListener("mouseup", (e)=>{
     allStrokes.push(currentStroke)
     currentStroke = null
     clearAndDrawStrokes();
+    sendCharacterDrawing(); // show the server our proud creation 
 })
 
 pregameCanvas.addEventListener("mousemove", (e)=>{
@@ -198,3 +209,21 @@ playSoundBiteButton.addEventListener("click", ()=>{
     audio.play()
 })
 
+
+const startGameButton = document.getElementById("startGameButton")
+let isStarting = false
+startGameButton.addEventListener("click", ()=>{
+    let packetToSend = null
+    if(isStarting == false){
+        packetToSend = { "packetPurpose": "StartGame" }
+        isStarting = true
+        startGameButton.innerText = "Cancel"
+    }
+    else{
+        packetToSend = { "packetPurpose": "CancelStartGame" }
+        isStarting = false
+        startGameButton.innerText = "Start Game"
+    }
+
+    sendMessage(JSON.stringify(packetToSend))
+})

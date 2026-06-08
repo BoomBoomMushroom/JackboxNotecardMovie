@@ -14,6 +14,13 @@ function unhideScreen(screenElement){
 }
 
 
+function isHostUpdate(){
+    let isHost = getPlayerIsHost()
+    let startGameButton = document.getElementById("startGameButton")
+    if(isHost){ startGameButton.classList.remove("hidden") }
+    else{ startGameButton.classList.add("hidden") }
+}
+
 function showPreEverythingScreen(){
     hideAllScreens()
     unhideScreen(preEverythingScreen)

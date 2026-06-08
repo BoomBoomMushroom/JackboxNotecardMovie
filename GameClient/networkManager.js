@@ -22,6 +22,9 @@ function handleReceiveMessage(data){
         case "SetPlayerColor":
             setPlayerColorIndex( data["colorIndex"] )
             return
+        case "SetHostStatus":
+            setPlayerIsHost( data["isHost"] )
+            return
         default:
             console.log(`Unknown packet purpose! "${packetPurpose}"`)
             return
@@ -51,5 +54,6 @@ websocket.addEventListener("message", (e) => {
 });
 
 websocket.addEventListener("error", (e) => {
-    console.error(`Error: ${e}`);
+    console.error(`Error connecting to the websocket server:`);
+    console.error(e)
 });
