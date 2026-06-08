@@ -38,7 +38,11 @@ websocket.addEventListener("open", () => {
     // set up a ping keep alive
     pingInterval = setInterval(() => {
         pingNumberCount++
-        sendMessage(`Ping ${pingNumberCount}`)
+        pingJson = {
+            "packetPurpose": "PingKeepAlive",
+            "data": `Ping ${pingNumberCount}`
+        }
+        sendMessage(JSON.stringify(pingJson))
     }, pingFrequencyMs);
 });
 

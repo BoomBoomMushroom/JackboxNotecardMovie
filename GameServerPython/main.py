@@ -10,13 +10,25 @@ MAX_CONNECTIONS = 16
 untakenColors = list(range(1,16+1))
 clients: list[Client] = []
 
+def getClientIndexFromAddress(address) -> int:
+    for i in range(0, len(clients)):
+        if clients[i].getAddress() == address: return i
+    return -1
+
 class Client():
     def __init__(self, address):
         self.address = address
         self.colorIndex = untakenColors.pop( random.randint(0, len(untakenColors)-1) )
+        
+        self.characterDrawing = [] # Empty array of strokes
+        self.soundBite = "" # Base64 audio clip
     
     def getAddress(self): return self.address
     def getColorIndex(self): return self.colorIndex
+    
+    def setSoundBite(self, soundBiteBase64):
+        self.soundBite = soundBiteBase64
+        print(f"Got sound bite base64: {self.soundBite}")
     
     def getInitPackets(self) -> list[dict]:
         packets = []
@@ -47,8 +59,21 @@ class GameServer(WebSocket):
     
     def handle(self):
         # todo: when we receive the profile image they make we should go through each stroke and make sure it uses either -1 (black), -2 (white), or their color index, if not we'll fix it for them. to prevent them from using colors they shouldn't have
-        print(f"Received `{self.data}`")
-        self.send_message(f"Echo: {self.data}")
+        
+        try: data = json.loads(self.data)
+        except:
+            print(f"[!!!] Message received is not json! Received: '{self.data}'")
+            return
+        
+        clientSentIndex: int = getClientIndexFromAddress(self.address)
+        purpose = data["packetPurpose"]
+        if purpose == "SendSoundBite":
+            clients[clientSentIndex].setSoundBite( data["audioBase64"] )
+        elif purpose == "PingKeepAlive":
+            pass # Cool we got a ping, anyways...
+        else:
+            print(f"Unknown purpose! \"{purpose}\"")
+        
     
     def handle_close(self):
         print(f"{self.address} disconnected!")

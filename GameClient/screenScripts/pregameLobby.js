@@ -6,8 +6,6 @@ const canvasDisplayHeight = pregameCanvas.clientHeight;
 pregameCanvas.width = canvasDisplayWidth;
 pregameCanvas.height = canvasDisplayHeight;
 
-//pregameCTX.fillStyle = "#000000" // default color is black
-
 let allStrokes = []
 let currentStroke = null
 
@@ -24,6 +22,9 @@ class CanvasStroke{
         this.points = points
         this.lineSize = lineSize
         this.isMarker = isMarker
+    }
+    toJSONString(){
+        return JSON.stringify(this)
     }
     isMarkerStroke(){ return this.isMarker }
     isEmpty(){ return this.points.length == 0 }
@@ -141,5 +142,59 @@ pregameCanvas.addEventListener("mousemove", (e)=>{
     allStrokes.push(currentStroke)
     clearAndDrawStrokes();
     allStrokes.pop()
+})
+
+
+const recordSoundBiteButton = document.getElementById("recordSoundBite")
+const playSoundBiteButton = document.getElementById("playSoundBite")
+
+let mediaRecorder = null
+let soundBiteChunks = []
+let soundBiteBlob = null
+let soundBiteBase64 = ""
+
+recordSoundBiteButton.addEventListener("click", async ()=>{
+    playSoundBiteButton.disabled = true
+    recordSoundBiteButton.disabled = true
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true
+    })
+    soundBiteChunks = []
+    mediaRecorder = new MediaRecorder(stream)
+    mediaRecorder.addEventListener("dataavailable", (event)=>{
+        soundBiteChunks.push(event.data)
+    })
+    mediaRecorder.addEventListener("stop", ()=>{
+        soundBiteBlob = new Blob(soundBiteChunks, {
+            type: "audio/webm"
+        })
+        playSoundBiteButton.disabled = false
+        recordSoundBiteButton.disabled = false
+        stream.getTracks().forEach(track => track.stop())
+
+        // get the base64 for the sound bite
+        let reader = new FileReader()
+        reader.addEventListener("loadend", ()=>{
+            soundBiteBase64 = reader.result
+            sendAudioJson = {
+                "packetPurpose": "SendSoundBite",
+                "audioBase64": soundBiteBase64,
+            }
+            sendMessage(JSON.stringify(sendAudioJson))
+        })
+        reader.readAsDataURL(soundBiteBlob)
+    })
+    mediaRecorder.start()
+
+    setTimeout(()=>{
+        mediaRecorder.stop()
+    }, 2000)
+})
+
+playSoundBiteButton.addEventListener("click", ()=>{
+    let audioUrl = URL.createObjectURL(soundBiteBlob)
+    let audio = new Audio(audioUrl)
+    audio.play()
 })
 
