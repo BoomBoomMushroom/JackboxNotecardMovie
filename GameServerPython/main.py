@@ -46,6 +46,7 @@ class GameServer(WebSocket):
         print(f"{self.address} connected!")
     
     def handle(self):
+        # todo: when we receive the profile image they make we should go through each stroke and make sure it uses either -1 (black), -2 (white), or their color index, if not we'll fix it for them. to prevent them from using colors they shouldn't have
         print(f"Received `{self.data}`")
         self.send_message(f"Echo: {self.data}")
     
