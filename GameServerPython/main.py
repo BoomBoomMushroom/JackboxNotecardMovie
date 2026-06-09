@@ -1,11 +1,15 @@
 from __future__ import annotations
-from typing import Literal
+from typing import Literal, get_args
 from simple_websocket_server import WebSocket, WebSocketServer
 
 import random
 import json
 
-_GameStates = Literal["PregameLobby", "DrawNoteCards", "RecordScenes", "Voting", "GameFinished"]
+_GameStates = Literal["PregameLobby", "PregameCountdown", "DrawNoteCards", "RecordScenes", "Voting", "GameFinished"]
+_PromptType = Literal[
+    "MostLeastQualified_PROFESSION", "Rookie_PROFESSION", "PoorlyDrawn_ANIMAL", "DrawSomeoneWearing__CLOTHING",
+    
+]
 MAX_CONNECTIONS = 16
 
 BLACK_COLOR_INDEX = -1
@@ -32,16 +36,65 @@ class Game():
     def getCurrentGameState(self) -> _GameStates: return self.currentGameState
     def setCurrentGameState(self, newState: _GameStates): self.currentGameState = newState
 
+    def startDrawNoteCards(self):
+        self.setCurrentGameState("DrawNoteCards")
+        
+        for i in range(0, self.getClientCount()):
+            self.getClient(i).sendPacket(json.dumps({"packetPurpose": "GoToDrawNoteCardsScene"}))
+        
+        self.giveEachClientPrompts(2)
+
+    def giveEachClientPrompts(self, numberOfPrompts=2):
+        for i in range(0, self.getClientCount()):
+            promptsPacket = {
+                "packetPurpose": "DrawPrompts",
+                "prompts": []
+            }
+            for _ in range(0, numberOfPrompts): promptsPacket["prompts"].append( self.generateNoteCardPrompt() )
+            
+            self.getClient(i).sendPacket( json.dumps(promptsPacket) )
+
+    def generateNoteCardPrompt(self) -> str:
+        # Okay so we must combine a few structures together
+        usePromptType: _PromptType = random.choice(get_args(_PromptType))
+        out = ""
+        
+        #usePromptType = "DrawSomeoneWearing__CLOTHING"
+        
+        if usePromptType == "MostLeastQualified_PROFESSION":
+            with open("./lists/occupations.txt", "r") as f: professions = f.read().split("\n")
+            adverb = random.choice(["most", "least"])
+            profession: str = random.choice(professions).lower()
+            out = f"The world's {adverb} qualified {profession}"
+        
+        elif usePromptType == "Rookie_PROFESSION":
+            with open("./lists/occupations.txt", "r") as f: professions = f.read().split("\n")
+            profession: str = random.choice(professions).lower()
+            out = f"A {profession} on their first day"
+        
+        elif usePromptType == "PoorlyDrawn_ANIMAL":
+            with open("./lists/animals.txt", "r") as f: animals = f.read().split("\n")
+            animal: str = random.choice(animals).lower()
+            out = f"A poorly drawn {animal}"
+        
+        elif usePromptType == "DrawSomeoneWearing__CLOTHING":
+            with open("./lists/clothings.txt", "r") as f: clothes = f.read().split("\n")
+            clothA: str = random.choice(clothes).lower()
+            out = f"Someone wearing {clothA}"
+        
+        return out
+
 class Client():
-    def __init__(self, address):
-        self.address = address
-        self.isHost = False
+    def __init__(self, socket: GameServerWebsocket):
+        self.socket: GameServerWebsocket = socket
+        self.isHost: bool = False
         self.colorIndex: int = game.getRandomColor()
         
         self.characterDrawing: list[dict] = [] # Empty array of strokes
         self.soundBite: str = "" # Base64 audio clip
     
-    def getAddress(self): return self.address
+    def getSocket(self) -> GameServerWebsocket: return self.socket
+    def getAddress(self): return self.socket.address
     def getColorIndex(self) -> int: return self.colorIndex
     
     def setSoundBite(self, soundBiteBase64: str):
@@ -70,6 +123,8 @@ class Client():
     def setIsHost(self, isHost: bool): self.isHost = isHost
     def getIsHost(self) -> bool: return self.isHost
     
+    def sendPacket(self, packet: str):
+        self.getSocket().send_message(packet)
     
     def getInitPackets(self) -> list[dict]:
         packets = []
@@ -83,6 +138,7 @@ class Client():
         })
         
         return packets
+    
     def disconnectCleanup(self):
         game.giveBackColorIndex( self.getColorIndex() ) # add our color index back into the pool
 
@@ -99,12 +155,50 @@ class GameServerWebsocket(WebSocket):
             self.send_message( json.dumps(disconnectPacket) )
             self.close() # We are not accepting them, full lobby
         
-        clientObject = Client(self.address)
+        # todo: make sure we cannot connect if we're not in the PregameLobby state unless we are reconnecting. Check via usernames
+        
+        clientObject = Client(self)
         if game.getClientCount() == 0: clientObject.setIsHost(True) # If they're the first to connect then make them the host
         for packet in clientObject.getInitPackets(): self.send_message(json.dumps(packet))
         
         game.addClient(clientObject)
         print(f"{self.address} connected!")
+    
+    def handlePacket_PregameLobby(self, data: dict, clientSentIndex: int, purpose: str):
+        purpose = data["packetPurpose"]
+        
+        if purpose == "SendSoundBite":
+            game.getClient(clientSentIndex).setSoundBite( data["audioBase64"] )
+        elif purpose == "SendCharacterDrawing":
+            game.getClient(clientSentIndex).setCharacterDrawing( data["drawingStrokes"] )
+        elif purpose == "StartGame":
+            if game.getClient(clientSentIndex).getIsHost() == False: return
+            game.setCurrentGameState("PregameCountdown")
+            # nothing much to do, the host client will send a follow up packet telling us when to start, since i dont want to thread a timer here
+            # todo: Make sure we have at least 2 player or something
+            # todo: on our gui server it should say the countdown starting now
+        else:
+            print(f"Unknown purpose! \"{purpose}\" in state PregameLobby")
+    
+    def handlePacket_PregameCountdown(self, data: dict, clientSentIndex: int, purpose: str):
+        purpose = data["packetPurpose"]
+        if purpose == "StartGameFollowUp":
+            if game.getClient(clientSentIndex).getIsHost() == False: return
+            
+            print("Starting draw note cards...")
+            game.startDrawNoteCards()
+        elif purpose == "CancelStartGame":
+            if game.getClient(clientSentIndex).getIsHost() == False: return
+            game.setCurrentGameState("PregameLobby")
+            # todo: make the gui server cancel the countdown
+        else:
+            print(f"Unknown purpose! \"{purpose}\" in state PregameCountdown")
+    
+    def handlePacket_DrawNoteCards(self, data: dict, clientSentIndex: int, purpose: str):
+        purpose = data["packetPurpose"]
+        if purpose == "PLACEHOLDER PURPOSE FOR LATER": pass
+        else:
+            print(f"Unknown purpose! \"{purpose}\" in state DrawNoteCards")
     
     def handle(self):
         # todo: when we receive the profile image they make we should go through each stroke and make sure it uses either -1 (black), -2 (white), or their color index, if not we'll fix it for them. to prevent them from using colors they shouldn't have
@@ -115,25 +209,19 @@ class GameServerWebsocket(WebSocket):
             return
         
         clientSentIndex: int = game.getClientIndexFromAddress(self.address)
-        purpose = data["packetPurpose"]
-        if purpose == "SendSoundBite":
-            if game.getCurrentGameState() != "PregameLobby": return
-            game.getClient(clientSentIndex).setSoundBite( data["audioBase64"] )
-        elif purpose == "SendCharacterDrawing":
-            if game.getCurrentGameState() != "PregameLobby": return
-            game.getClient(clientSentIndex).setCharacterDrawing( data["drawingStrokes"] )
-        elif purpose == "StartGame":
-            if game.getCurrentGameState() != "PregameLobby": return
-            # todo: Make sure we have at least 2 player or something
-            
-        elif purpose == "CancelStartGame":
-            if game.getCurrentGameState() != "PregameLobby": return
-            
-        elif purpose == "PingKeepAlive":
-            pass # Cool we got a ping, anyways...
+        currentGameState: _GameStates = game.getCurrentGameState()
         
-        else:
-            print(f"Unknown purpose! \"{purpose}\"")
+        purpose: str = data["packetPurpose"]
+        if purpose == "PingKeepAlive": return
+        
+        if currentGameState == "PregameLobby":
+            self.handlePacket_PregameLobby(data, clientSentIndex, purpose)
+        elif currentGameState == "PregameCountdown":
+            self.handlePacket_PregameCountdown(data, clientSentIndex, purpose)
+        elif currentGameState == "DrawNoteCards":
+            self.handlePacket_DrawNoteCards(data, clientSentIndex, purpose)
+        else: print(f"Unhandled game state: {currentGameState}")
+        
         
     
     def handle_close(self):
@@ -143,6 +231,9 @@ class GameServerWebsocket(WebSocket):
         game.getClient(clientIndex).disconnectCleanup()
         game.removeClient(clientIndex)
         print("\tRemoved client from list")
+        
+        # this is only here to reset the lobby as im testing so i dont need to end the server and start it back up every time
+        game.setCurrentGameState("PregameLobby")
 
 server = WebSocketServer("0.0.0.0", 8080, GameServerWebsocket)
 

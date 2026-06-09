@@ -212,17 +212,26 @@ playSoundBiteButton.addEventListener("click", ()=>{
 
 const startGameButton = document.getElementById("startGameButton")
 let isStarting = false
+let followUpCountdown = null
+
 startGameButton.addEventListener("click", ()=>{
     let packetToSend = null
     if(isStarting == false){
         packetToSend = { "packetPurpose": "StartGame" }
         isStarting = true
         startGameButton.innerText = "Cancel"
+
+        // Send a follow up packet because I don't want to multithread on the server to run a background timer.
+        followUpCountdown = setTimeout(()=>{
+            let followUpPacket = { "packetPurpose": "StartGameFollowUp" }
+            sendMessage(JSON.stringify(followUpPacket))
+        }, 3000)
     }
     else{
         packetToSend = { "packetPurpose": "CancelStartGame" }
         isStarting = false
         startGameButton.innerText = "Start Game"
+        clearTimeout(followUpCountdown)
     }
 
     sendMessage(JSON.stringify(packetToSend))

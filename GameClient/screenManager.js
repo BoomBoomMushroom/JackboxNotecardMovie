@@ -1,7 +1,8 @@
 const preEverythingScreen = document.getElementById("preEverything")
 const pregameScreen = document.getElementById("pregame")
+const makeNoteCardsScreen = document.getElementById("makeNoteCardScreen")
 
-let allScreens = [preEverythingScreen, pregameScreen]
+let allScreens = [preEverythingScreen, pregameScreen, makeNoteCardsScreen]
 showPreEverythingScreen() // as the default screen
 
 function hideAllScreens(){
@@ -29,4 +30,9 @@ function showPreEverythingScreen(){
 function showPregameScreen(){
     hideAllScreens()
     unhideScreen(pregameScreen)
+}
+
+function showMakeNoteCardsScreen(){
+    hideAllScreens()
+    unhideScreen(makeNoteCardsScreen)
 }

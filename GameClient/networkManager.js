@@ -25,6 +25,13 @@ function handleReceiveMessage(data){
         case "SetHostStatus":
             setPlayerIsHost( data["isHost"] )
             return
+        case "GoToDrawNoteCardsScene":
+            showMakeNoteCardsScreen();
+            return
+        case "DrawPrompts":
+            let prompts = data["prompts"]
+            console.log(prompts)
+            return
         default:
             console.log(`Unknown packet purpose! "${packetPurpose}"`)
             return
